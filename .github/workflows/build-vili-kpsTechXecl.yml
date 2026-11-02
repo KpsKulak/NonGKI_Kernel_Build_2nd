@@ -137,6 +137,26 @@ jobs:
 
           ccache -C
 
+          # Fix LineageOS source quirk: focaltech_3680 Makefile uses spaces (breaks make)
+          FOCALTECH_MAKEFILE="drivers/input/touchscreen/focaltech_3680/Makefile"
+          if [ -f "$FOCALTECH_MAKEFILE" ]; then
+            sed -i 's/^ \+/\t/' "$FOCALTECH_MAKEFILE"
+            echo "Fixed $FOCALTECH_MAKEFILE (spaces -> tabs)"
+          fi
+
+          # Suppress noisy warnings in a few Makefiles (avoid -Werror failures)
+          for entry in \
+            "drivers/soc/qcom/Makefile:-Wno-unused-variable" \
+            "drivers/thermal/Makefile:-Wno-fortify-source" \
+            "techpack/bootinfo/Makefile:-Wno-unused-result" \
+            "drivers/usb/dwc3/Makefile:-Wno-unused-label"; do
+              MK="${entry%:*}"
+              FLAG="${entry#*:}"
+              if [ -f "$MK" ] && ! grep -q -- "$FLAG" "$MK" 2>/dev/null; then
+                echo "ccflags-y += $FLAG" >> "$MK"
+              fi
+          done
+
           echo "=== Prepare .config (lahaina-qgki + vili + xiaomi fragments) ==="
           rm -rf ${{ env.OUTPUT_DIR }}
           rm -f .config
