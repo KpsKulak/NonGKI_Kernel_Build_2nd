@@ -1,0 +1,23 @@
+name: Clean KSU RC Hook
+description: Remove ksu_init_rc_hook residual code and config
+
+# 核心：自定义 Action 必须用 runs + steps 结构
+runs:
+  using: "composite"
+  steps:
+    - name: Check residual code
+      shell: bash
+      run: |
+        grep -rn --include='*.[ch]' 'ksu_init_rc_hook' . || true
+        grep -rn --include='*.[ch]' 'CONFIG_KERNELSU_RC_HOOK' . || true
+
+    - name: Clean RC Hook code
+      shell: bash
+      run: |
+        find . -type f \( -name "*.c" -o -name "*.h" \) -exec sed -i '/ksu_init_rc_hook/d' {} \;
+        find . -type f \( -name "*.c" -o -name "*.h" \) -exec sed -i '/^#ifdef CONFIG_KERNELSU_RC_HOOK/,/^#endif/d' {} \;
+
+    - name: Verify
+      shell: bash
+      run: |
+        grep -rn --include='*.[ch]' 'ksu_init_rc_hook' . || echo "✅ Clean completed"
