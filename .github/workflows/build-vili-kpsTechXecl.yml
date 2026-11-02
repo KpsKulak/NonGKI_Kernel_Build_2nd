@@ -156,6 +156,10 @@ jobs:
           echo "=== Apply SUSFS inline-hook patches (adds ksu_handle_setresuid etc.) ==="
           bash "${{ github.workspace }}/workflow_repo/Patches/susfs_inline_hook_patches.sh" || true
 
+          echo "=== Fix stat.c: script injected 'flag' instead of 'flags' ==="
+          sed -i 's/ksu_handle_stat(&dfd, &fname, &flag)/ksu_handle_stat(\&dfd, \&fname, \&flags)/' fs/stat.c
+          grep -n "ksu_handle_stat" fs/stat.c || true
+
           echo "=== Verify ksu_handle_setresuid present in kernel/sys.c ==="
           grep -n "ksu_handle_setresuid" kernel/sys.c || echo "(WARN: setresuid hook not found)"
 
