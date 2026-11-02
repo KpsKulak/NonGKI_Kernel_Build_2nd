@@ -15,6 +15,7 @@ env:
   CLANG_DIR: "${{ github.workspace }}/clang"
   CCACHE_DIR: "${{ github.workspace }}/.ccache"
   KERNEL_DIR: "${{ github.workspace }}/kernel"
+  SUSFS_PATCH_FILE: "susfs_patch_to_5.4.patch"
 
 jobs:
   build:
@@ -27,6 +28,12 @@ jobs:
           repository: ${{ env.KERNEL_REPO }}
           ref: ${{ env.KERNEL_BRANCH }}
           path: kernel
+          fetch-depth: 1
+
+      - name: Checkout Workflow Repo (Patches)
+        uses: actions/checkout@v4
+        with:
+          path: workflow_repo
           fetch-depth: 1
 
       - name: Verify Kernel Commit & Clean Workspace
@@ -58,6 +65,17 @@ jobs:
           tar -xf clang.tar.xz -C ${{ env.CLANG_DIR }} --strip-components=1
           rm clang.tar.xz
           ${{ env.CLANG_DIR }}/bin/clang --version
+
+      - name: Apply SUSFS Core Patch
+        working-directory: kernel
+        run: |
+          PATCH="${{ github.workspace }}/workflow_repo/Patches/Patch/${{ env.SUSFS_PATCH_FILE }}"
+          echo "Applying SUSFS core patch: $PATCH"
+          patch -p1 -N --batch --forward --no-backup-if-mismatch < "$PATCH" || true
+          echo "=== .rej files (rejected hunks) ==="
+          find . -name "*.rej" | head -50 || true
+          echo "=== verify fs/susfs.c exists ==="
+          ls -la fs/susfs.c 2>/dev/null || echo "(fs/susfs.c missing)"
 
       - name: Manual integrate BakaSU into Kernel
         working-directory: kernel
@@ -134,6 +152,12 @@ jobs:
               echo "obj-y += $HIDE_OBJ" >> "$SELINUX_MK"
             fi
           fi
+
+          echo "=== Apply SUSFS inline-hook patches (adds ksu_handle_setresuid etc.) ==="
+          bash "${{ github.workspace }}/workflow_repo/Patches/susfs_inline_hook_patches.sh" || true
+
+          echo "=== Verify ksu_handle_setresuid present in kernel/sys.c ==="
+          grep -n "ksu_handle_setresuid" kernel/sys.c || echo "(WARN: setresuid hook not found)"
 
           ccache -C
 
